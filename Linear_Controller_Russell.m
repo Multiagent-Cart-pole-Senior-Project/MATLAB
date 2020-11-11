@@ -3,7 +3,9 @@
 % 
 % Control Algorithm Developed from: 
 % "ECE 221 Project: Inverted Pendulum"
-% By: Dr. Jing Wang
+%    By: Dr. Jing Wang
+
+
 
 % State Variables:
 % x1 = Theta
@@ -29,9 +31,9 @@ g = 9.81; % [m/s^2] - Gravitational Acceleration Constant
 t0 = 0; % [s] - Start time
 tf = 20; % [s] - End time
 T = 0.01; % [s] - Sampling Time
-t = t0:T:tf;
+t = t0:T:tf; % Time Vector
 
-x(:,1) = [0.1; 0; 0; 0]; % Initial Conditions
+x(:,1) = [0.11; 0; 0; 0]; % Initial Conditions
 
 % State Matrices
 A = [0, 1, 0, 0; (g*(M+m))/(M*l), 0, 0, b/(M*l); 0, 0, 0, 1; -(m*g)/M, 0, 0, -b/M];
@@ -41,7 +43,8 @@ C = [1, 0, 0, 0; 0, 0, 1, 0];
 % Desired Pole Locataions
 zeta = 0.6;
 w_n = 1;
-pole_d = [-zeta*w_n+1i*w_n*sqrt(1-zeta^2); -zeta*w_n-1i*w_n*sqrt(1-zeta^2); -5*zeta*w_n; -8*zeta*w_n];
+pole_d = [-zeta*w_n+1i*w_n*sqrt(1-zeta^2); -zeta*w_n-1i*w_n*sqrt(1-zeta^2);...
+                                                    -5*zeta*w_n; -8*zeta*w_n];
 
 % Control Gain Vector
 K = acker(A,B,pole_d);
