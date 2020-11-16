@@ -33,7 +33,7 @@ tf = 20; % [s] - End time
 T = 0.01; % [s] - Sampling Time
 t = t0:T:tf; % Time Vector
 
-x(:,1) = [0.11; 0; 0; 0]; % Initial Conditions
+x(:,1) = [0.11; 0; 2; 0]; % Initial Conditions
 
 % State Matrices
 A = [0, 1, 0, 0; (g*(M+m))/(M*l), 0, 0, b/(M*l); 0, 0, 0, 1; -(m*g)/M, 0, 0, -b/M];
