@@ -58,7 +58,6 @@ s4d = -8*zeta*omegan;
 %s3d = -10*zeta*omegan;
 %s4d = -20*zeta*omegan;
 
-
 Sd =[s1d; s2d; s3d; s4d];
 K = acker(A,B, Sd);
 k1 = K(1);
@@ -83,7 +82,6 @@ Ad = [0 1 0; 1 0 1; 0 1 0];
 Bd = [1 0 0]';
 
 
-
 % agent 1
 xx0_1 = [0.02; 0 ; 0; 0];
 
@@ -96,7 +94,7 @@ xx0_3 = [0.03; 0 ; 0; 0];
 
 
 % Control gain
-c=3;
+c = 3;
 K2 = c*K;
 K1 = K2;
 
