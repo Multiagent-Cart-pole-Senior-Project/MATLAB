@@ -77,12 +77,8 @@ Dd = diag(d);
 % Q-table 1
 if d(2) ~= 0
     for i = 1:d(2)
-        for j = 1:4
-            if exist('Q_size1') 
-                Q_size1(length(Q_size1)+1) = NUM_states;
-            else
-                Q_size1(1) = NUM_states;
-            end
+        for j = i:i+4
+            Q_size1(j) = NUM_states;
         end
     end
     Q_size1(length(Q_size1)+1) = NUM_actions;
@@ -92,13 +88,9 @@ Q_1 = randn(Q_size1);
 % Q-table 2
 if d(3) ~= 0
     for i = 1:d(3)
-        for j = 1:4
-            if exist('Q_size2') 
-                Q_size2(length(Q_size2)+1) = NUM_states;
-            else
-                Q_size2(1) = NUM_states;
-            end
-        end  
+        for j = i:i+4
+            Q_size2(j) = NUM_states;
+        end
     end
     Q_size2(length(Q_size2)+1) = NUM_actions;
 end
@@ -107,12 +99,8 @@ Q_2 = randn(Q_size2);
 % Q-table 3
 if d(4) ~= 0
     for i = 1:d(4)
-        for j = 1:4
-            if exist('Q_size3') 
-                Q_size3(length(Q_size3)+1) = NUM_states;
-            else
-                Q_size3(1) = NUM_states;
-            end
+        for j = i:i+4
+            Q_size3(j) = NUM_states;
         end
     end
     Q_size3(length(Q_size3)+1) = NUM_actions;
@@ -131,12 +119,8 @@ Learning_Rate = 0.1;
 for i = 1:EPISODES
     k = 1; % Starting timestep
     kf = tf/T; % Final timestep
-    
-    % Reward Summations for each agent
-    rewards_1 = 0;
-    rewards_2 = 0;
-    rewards_3 = 0;
-    
+    rewards_1 = 
+
     while k <= kf +1
 
         % Agent 0
@@ -154,7 +138,7 @@ for i = 1:EPISODES
         % Agent 1
         dis_1 = getDiscreteState(x_1(:,k),low_guess,window_size);
         [argvalue, argmax] = max(Q_1(dis_1(1),dis_1(2),dis_1(3),dis_1(4),:));
-        [x, y, action] = ind2sub(Q_size1, argmax);
+        action = argmax;
         u_1(k) = u_q(action);
 
         x_1(1,k+1) = x_1(1,k) + T * x_1(2,k);
@@ -169,8 +153,6 @@ for i = 1:EPISODES
             A(2,2)*(-2/d(2)*abs(x_1(1,k) - x_1(1,k)) - 10/d(2)*abs(x_1(3,k) - x_1(3,k))) + ...
             A(2,3)*(-2/d(2)*abs(x_2(1,k) - x_1(1,k)) - 10/d(2)*abs(x_2(3,k) - x_1(3,k))) + ...
             A(2,4)*(-2/d(2)*abs(x_3(1,k) - x_1(1,k)) - 10/d(2)*abs(x_3(3,k) - x_1(3,k)));
-        
-        rewards_1 = rewards_1 + reward;
 
         dis_11 = getDiscreteState(x_1(:,k+1),low_guess,window_size);
         [argvalue1, argmax1] = max(Q_1(dis_11(1),dis_11(2),dis_11(3),dis_11(4),:));
@@ -183,7 +165,7 @@ for i = 1:EPISODES
         % Agent 2
         dis_1 = getDiscreteState(x_2(:,k),low_guess,window_size);
         [argvalue, argmax] = max(Q_2(dis_1(1),dis_1(2),dis_1(3),dis_1(4),:));
-        [x, y, action] = ind2sub(Q_size2, argmax);  
+        action = argmax;   
         u_2(k) = u_q(action);
 
         x_2(1,k+1) = x_2(1,k) + T * x_2(2,k);
@@ -198,8 +180,6 @@ for i = 1:EPISODES
             A(3,2)*(-2/d(3)*abs(x_1(1,k) - x_2(1,k)) - 10/d(3)*abs(x_1(3,k) - x_2(3,k))) + ...
             A(3,3)*(-2/d(3)*abs(x_2(1,k) - x_2(1,k)) - 10/d(3)*abs(x_2(3,k) - x_2(3,k))) + ...
             A(3,4)*(-2/d(3)*abs(x_3(1,k) - x_2(1,k)) - 10/d(3)*abs(x_3(3,k) - x_2(3,k)));
-        
-        rewards_2 = rewards_2 + reward;
 
         dis_11 = getDiscreteState(x_2(:,k+1),low_guess,window_size);
         [argvalue1, argmax1] = max(Q_2(dis_11(1),dis_11(2),dis_11(3),dis_11(4),:));
@@ -212,7 +192,7 @@ for i = 1:EPISODES
         % Agent 3
         dis_1 = getDiscreteState(x_3(:,k),low_guess,window_size);
         [argvalue, argmax] = max(Q_3(dis_1(1),dis_1(2),dis_1(3),dis_1(4),:));
-        [x, y, action] = ind2sub(Q_size3, argmax);   
+        action = argmax;     
         u_3(k) = u_q(action);
 
         x_3(1,k+1) = x_3(1,k) + T * x_3(2,k);
@@ -227,8 +207,6 @@ for i = 1:EPISODES
             A(4,2)*(-2/d(4)*abs(x_1(1,k) - x_3(1,k)) - 10/d(4)*abs(x_1(3,k) - x_3(3,k))) + ...
             A(4,3)*(-2/d(4)*abs(x_2(1,k) - x_3(1,k)) - 10/d(4)*abs(x_2(3,k) - x_3(3,k))) + ...
             A(4,4)*(-2/d(4)*abs(x_3(1,k) - x_3(1,k)) - 10/d(4)*abs(x_3(3,k) - x_3(3,k)));
-        
-        rewards_3 = rewards_3 + reward;
 
         dis_11 = getDiscreteState(x_3(:,k+1),low_guess,window_size);
         [argvalue1, argmax1] = max(Q_3(dis_11(1),dis_11(2),dis_11(3),dis_11(4),:));
@@ -240,8 +218,6 @@ for i = 1:EPISODES
 
         k = k + 1; % Update Timestep
     end
-    
-    % Record reward Summations for each agent after each episode
     reward_sum(:,i) = [rewards_1; rewards_2; rewards_3];
 end
 
@@ -277,18 +253,6 @@ title('Pole Angle')
 ylabel('Angle [rad]')
 xlabel('Time [s]')
 grid on
-
-figure
-plot(1:EPISODES, reward_sum(1,:))
-hold on 
-plot(1:EPISODES, reward_sum(2,:))
-hold on
-plot(1:EPISODES, reward_sum(3,:))
-title('Agent Rewards each Episode')
-ylabel('Reward')
-xlabel('Episode')
-grid on
-
 
 % Function to get discrete state of cart-pole
 function disc = getDiscreteState(x,low_guess,window_size)
