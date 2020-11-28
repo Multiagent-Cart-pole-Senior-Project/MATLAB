@@ -375,6 +375,7 @@ function u = action(x,xl,adj,theta)
         u(i) = max(min(u(i),action_space(2)),action_space(1));
     end
 end
+
 % Gaussian curve
 function z = gaussian(x,sig,Q,mu)
     z = exp(-(x.*x - mu)./sig.^2)*Q;
