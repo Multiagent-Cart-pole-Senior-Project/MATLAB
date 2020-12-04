@@ -4,6 +4,8 @@
 % Linear Control Algorithm Developed from: 
 % "ECE 221 Project: Inverted Pendulum"
 %    By: Dr. Jing Wang
+% 
+% Nonlinear Model Developed by: Dr. Wang
 
 % State Variables:
 % x1 = Theta
@@ -16,11 +18,13 @@ clear all
 clc
 
 %% PARAMETERS
-M = .5; % [kg] - Mass of the Cart
-m = 0.1; % [kg] - Mass of the pendulum
+M = 0.5; % [kg] - Mass of the Cart
+m = 0.2; % [kg] - Mass of the pendulum
 b = 0.1; % [N/(m/s)] - Coefficient of friction of the cart
-l = 0.5; % [m] - Length of pendulum center of mass
+l = 0.3; % [m] - Length of pendulum center of mass
 g = 9.81; % [m/s^2] - Gravitational Acceleration Constant
+
+MAX_CONTROL = 10; % Maximum Absolute value of Control Input
 
 t0 = 0; % [s] - Start time
 tf = 10; % [s] - End time
@@ -30,7 +34,7 @@ t = t0:T:tf; % Time Vector
 N = 3; % Number of Agents (excluding leader)
 
 % Initial Conditions
-x_0(:,1) = [0.11; 0; 2; 0]; % Initial Conditions - Agent 0 (Leader)
+x_0(:,1) = [0.11; 0; 1; 0]; % Initial Conditions - Agent 0 (Leader)
 x_1(:,1) = [0.02; 0; 0; 0]; % Initial Conditions - Agent 1 (Follower)
 x_2(:,1) = [0.03; 0; 0; 0]; % Initial Conditions - Agent 2 (Follower)
 x_3(:,1) = [-0.01; 0; 0; 0]; % Initial Conditions - Agent 3 (Follower)
@@ -85,7 +89,7 @@ P = eye(N) - inv(Dd)*Ld;
 
 
 %% Deep Q-Learning Parameters
-EPISODES = 10000;
+EPISODES = 1;
 LEARNING_RATE = 0.1;
 
 Gamma = [1, 0, 0, 0; 0, 0, 0, 0; 0, 0, 1, 0; 0, 0, 0, 0];
@@ -93,6 +97,7 @@ Lambda = 0.1*eye(N);
 Nu = [0.8; 1; 0.08];
 
 theta(:,:,1) = 1e-6*rand(N,3); % Initial NN weights
+theta_end_ep(:,:,1) = theta(:,:,1);
 
 
 %% Simulation (Discrete Time - Euler Integration)
@@ -103,13 +108,25 @@ for i = 1:EPISODES
     k = 1; % Starting timestep
     kf = tf/T; % Final timestep
     
+    theta(:,:,1) = theta_end_ep(:,:,i);
+    
     % Reward Summations for each agent
     rewards_1 = 0;
     rewards_2 = 0;
     rewards_3 = 0;
     
+    % Initial Values
+    x_pos_0(1) = x_0(3,1);
+    Theta_0(1) = x_0(1,1);
+    x_pos_1(1) = x_1(3,1);
+    Theta_1(1) = x_1(1,1);
+    x_pos_2(1) = x_2(3,1);
+    Theta_2(1) = x_2(1,1);
+    x_pos_3(1) = x_3(3,1);
+    Theta_3(1) = x_3(1,1);
+    
     % Episode Loop
-    while k <= kf +1
+    while k <= kf
         
         %% Agent actions and next state
         
@@ -118,52 +135,64 @@ for i = 1:EPISODES
         
         % Agent 0 (Leader)
         u0_temp = -K*x_0(:,k); % Control Input
-        u_0(k) = sign(u0_temp)*min(1 , abs(u0_temp)); % Limit Control Input from -1 to 1
+        u_0(k) = sign(u0_temp)*min(MAX_CONTROL, abs(u0_temp)); % Limit Control Input from -1 to 1
         u_0(k+1) = u_0(k);
-        
-        x_0(1,k+1) = x_0(1,k) + T * x_0(2,k);
-        x_0(2,k+1) = x_0(2,k) + T * ((g*(M+m))/(M*l)*x_0(1,k) + b/(M*l)*x_0(4,k) - (1/(M*l))*u_0(k));
-        x_0(3,k+1) = x_0(3,k) + T * x_0(4,k);
-        x_0(4,k+1) = x_0(4,k) + T * (-((m*g)/M)*x_0(1,k) - (b/M)* x_0(4,k) + (1/M)*u_0(k));
 
-        x_pos_0(k) = x_0(3,k);
-        Theta_0(k) = x_0(1,k);
+        x0k = [x_0(:,k); u_0(k)];
+        [tt, x0k1] = ode45('Cart_model', [t(k) t(k+1)], x0k);
+        
+        x_0(1,k+1) = x0k1(length(tt),1);
+        x_0(2,k+1) = x0k1(length(tt),2);
+        x_0(3,k+1) = x0k1(length(tt),3);
+        x_0(4,k+1) = x0k1(length(tt),4);
+        
+        x_pos_0(k+1,i) = x_0(3,k+1);
+        Theta_0(k+1,i) = x_0(1,k+1);
 
         % Agent 1
         u1_temp = u(1,k);
-        u_1(k) = sign(u1_temp)*min(1 , abs(u1_temp)); % Limit Control Input from -1 to 1
+        u_1(k) = sign(u1_temp)*min(MAX_CONTROL, abs(u1_temp)); % Limit Control Input from -1 to 1
         
-        x_1(1,k+1) = x_1(1,k) + T * x_1(2,k);
-        x_1(2,k+1) = x_1(2,k) + T * ((g*(M+m))/(M*l)*x_1(1,k) + b/(M*l)*x_1(4,k) - (1/(M*l))*u_1(k));
-        x_1(3,k+1) = x_1(3,k) + T * x_1(4,k);
-        x_1(4,k+1) = x_1(4,k) + T * (-((m*g)/M)*x_1(1,k) - (b/M)* x_1(4,k) + (1/M)*u_1(k));
-
-        x_pos_1(k) = x_1(3,k);
-        Theta_1(k) = x_1(1,k);
+        x1k = [x_1(:,k); u_1(k)];
+        [tt, x1k1] = ode45('Cart_model', [t(k) t(k+1)], x1k);
+        
+        x_1(1,k+1) = x1k1(length(tt),1);
+        x_1(2,k+1) = x1k1(length(tt),2);
+        x_1(3,k+1) = x1k1(length(tt),3);
+        x_1(4,k+1) = x1k1(length(tt),4);
+        
+        x_pos_1(k+1,i) = x_1(3,k+1);
+        Theta_1(k+1,i) = x_1(1,k+1);
 
         % Agent 2  
         u2_temp = u(2,k);
-        u_2(k) = sign(u2_temp)*min(1 , abs(u2_temp)); % Limit Control Input from -1 to 1
+        u_2(k) = sign(u2_temp)*min(MAX_CONTROL, abs(u2_temp)); % Limit Control Input from -1 to 1
         
-        x_2(1,k+1) = x_2(1,k) + T * x_2(2,k);
-        x_2(2,k+1) = x_2(2,k) + T * ((g*(M+m))/(M*l)*x_2(1,k) + b/(M*l)*x_2(4,k) - (1/(M*l))*u_2(k));
-        x_2(3,k+1) = x_2(3,k) + T * x_2(4,k);
-        x_2(4,k+1) = x_2(4,k) + T * (-((m*g)/M)*x_2(1,k) - (b/M)* x_2(4,k) + (1/M)*u_2(k));
-
-        x_pos_2(k) = x_2(3,k);
-        Theta_2(k) = x_2(1,k);  
+        x2k = [x_2(:,k); u_2(k)];
+        [tt, x2k1] = ode45('Cart_model', [t(k) t(k+1)], x2k);
+        
+        x_2(1,k+1) = x2k1(length(tt),1);
+        x_2(2,k+1) = x2k1(length(tt),2);
+        x_2(3,k+1) = x2k1(length(tt),3);
+        x_2(4,k+1) = x2k1(length(tt),4);
+        
+        x_pos_2(k+1,i) = x_2(3,k+1);
+        Theta_2(k+1,i) = x_2(1,k+1);  
 
         % Agent 3  
         u3_temp = u(3,k);
-        u_3(k) = sign(u3_temp)*min(1 , abs(u3_temp)); % Limit Control Input from -1 to 1
-
-        x_3(1,k+1) = x_3(1,k) + T * x_3(2,k);
-        x_3(2,k+1) = x_3(2,k) + T * ((g*(M+m))/(M*l)*x_3(1,k) + b/(M*l)*x_3(4,k) - (1/(M*l))*u_3(k));
-        x_3(3,k+1) = x_3(3,k) + T * x_3(4,k);
-        x_3(4,k+1) = x_3(4,k) + T * (-((m*g)/M)*x_3(1,k) - (b/M)* x_3(4,k) + (1/M)*u_3(k));
-
-        x_pos_3(k) = x_3(3,k);
-        Theta_3(k) = x_3(1,k);  
+        u_3(k) = sign(u3_temp)*min(MAX_CONTROL, abs(u3_temp)); % Limit Control Input from -1 to 1
+        
+        x3k = [x_3(:,k); u_3(k)];
+        [tt, x3k1] = ode45('Cart_model', [t(k) t(k+1)], x3k);
+        
+        x_3(1,k+1) = x3k1(length(tt),1);
+        x_3(2,k+1) = x3k1(length(tt),2);
+        x_3(3,k+1) = x3k1(length(tt),3);
+        x_3(4,k+1) = x3k1(length(tt),4);
+        
+        x_pos_3(k+1,i) = x_3(3,k+1);
+        Theta_3(k+1,i) = x_3(1,k+1);  
         
         %% Put States and Actions in Matrices
         % States
@@ -208,6 +237,9 @@ for i = 1:EPISODES
         k = k + 1; % Update Timestep
     end
     
+    % Save Theta for start of episode
+    theta_end_ep(:,:,i+1) = theta(:,:,kf);
+    
     % Record reward Summations for each agent after each episode
     reward_sum(:,i) = [rewards_1; rewards_2; rewards_3];
 end
@@ -215,30 +247,60 @@ end
 
 %% PLOT RESULTS
 figure
-subplot(2,1,1)
-plot(t,x_pos_0)
+subplot(2,2,1)
+plot(t,x_pos_0(:,1))
 hold on 
-plot(t,x_pos_1)
+plot(t,x_pos_1(:,1))
 hold on 
-plot(t,x_pos_2)
+plot(t,x_pos_2(:,1))
 hold on 
-plot(t,x_pos_3) 
-title('Cart Position')
+plot(t,x_pos_3(:,1)) 
+title('Cart Position (Episode 1)')
 ylabel('Position [m]')
 xlabel('Time [s]')
+legend('Agent 0 (Leader)', 'Agent 1', 'Agent 2', 'Agent 3')
 grid on
 
-subplot(2,1,2)
-plot(t,Theta_0)
+subplot(2,2,2)
+plot(t,Theta_0(:,1))
 hold on
-plot(t,Theta_1)
+plot(t,Theta_1(:,1))
 hold on
-plot(t,Theta_2)
+plot(t,Theta_2(:,1))
 hold on
-plot(t,Theta_3)
-title('Pole Angle')
+plot(t,Theta_3(:,1))
+title('Pole Angle (Episode 1)')
 ylabel('Angle [rad]')
 xlabel('Time [s]')
+legend('Agent 0 (Leader)', 'Agent 1', 'Agent 2', 'Agent 3')
+grid on
+
+subplot(2,2,3)
+plot(t,x_pos_0(:,EPISODES))
+hold on 
+plot(t,x_pos_1(:,EPISODES))
+hold on 
+plot(t,x_pos_2(:,EPISODES))
+hold on 
+plot(t,x_pos_3(:,EPISODES)) 
+title('Cart Position (Last Episode)')
+ylabel('Position [m]')
+xlabel('Time [s]')
+legend('Agent 0 (Leader)', 'Agent 1', 'Agent 2', 'Agent 3')
+grid on
+
+subplot(2,2,4)
+plot(t,Theta_0(:,EPISODES))
+hold on
+plot(t,Theta_1(:,EPISODES))
+hold on
+plot(t,Theta_2(:,EPISODES))
+hold on
+plot(t,Theta_3(:,EPISODES))
+title('Pole Angle (Last Episode)')
+ylabel('Angle [rad]')
+xlabel('Time [s]')
+legend('Agent 0 (Leader)', 'Agent 1', 'Agent 2', 'Agent 3')
 grid on
 
 figure
