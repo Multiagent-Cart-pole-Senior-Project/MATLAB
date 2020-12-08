@@ -24,26 +24,22 @@ b = 0.1; % [N/(m/s)] - Coefficient of friction of the cart
 l = 0.3; % [m] - Length of pendulum center of mass
 g = 9.81; % [m/s^2] - Gravitational Acceleration Constant
 
-MAX_CONTROL = 10; % Maximum Absolute value of Control Input
+MAX_CONTROL = 1000; % Maximum Absolute value of Control Input
 
 t0 = 0; % [s] - Start time
-tf = 10; % [s] - End time
+tf = 50; % [s] - End time
 T = 0.01; % [s] - Sampling Time
 t = t0:T:tf; % Time Vector
 
-N = 3; % Number of Agents (excluding leader)
+N = 1; % Number of Agents (excluding leader)
 
 % Initial Conditions
-x_0(:,1) = [0.11; 0; 1; 0]; % Initial Conditions - Agent 0 (Leader)
+x_0(:,1) = [0.04; 0; 0.5; 0]; % Initial Conditions - Agent 0 (Leader)
 x_1(:,1) = [0.02; 0; 0; 0]; % Initial Conditions - Agent 1 (Follower)
-x_2(:,1) = [0.03; 0; 0; 0]; % Initial Conditions - Agent 2 (Follower)
-x_3(:,1) = [-0.01; 0; 0; 0]; % Initial Conditions - Agent 3 (Follower)
 
 % States
 xl(:,1) = x_0(:,1);
 x(:,1,1) = x_1(:,1);
-x(:,2,1) = x_2(:,1);
-x(:,3,1) = x_3(:,1);
 
 %% Linear Controller
 
@@ -64,10 +60,10 @@ K = acker(A,B,pole_d);
 %% Communication Matrices
 
 % Communication with Leader
-Bd = [1 1 1 1];
+Bd = [1];
 
 % Adjacency Matrix
-Ad = [0 1 1; 1 0 1; 1 1 0];
+Ad = [0 0; 1 0];
 
 % Diagonal Matrix
 for i = 1:N
@@ -89,7 +85,7 @@ P = eye(N) - inv(Dd)*Ld;
 
 
 %% Deep Q-Learning Parameters
-LEARNING_RATE = 0.01;
+LEARNING_RATE = 0.3;
 
 Gamma = [1, 0, 0, 0; 0, 0, 0, 0; 0, 0, 1, 0; 0, 0, 0, 0];
 Lambda = 0.1*eye(N);
@@ -103,6 +99,11 @@ theta_end_ep(:,:,1) = theta(:,:,1);
 k = 1; % Starting timestep
 kf = tf/T; % Final timestep
 
+% Reward Summations for each agent
+rewards_1 = 0;
+rewards_2 = 0;
+rewards_3 = 0;
+
 % Initial Values
 x_pos_0(1) = x_0(3,1);
 Theta_0(1) = x_0(1,1);
@@ -112,19 +113,18 @@ x_pos_2(1) = x_2(3,1);
 Theta_2(1) = x_2(1,1);
 x_pos_3(1) = x_3(3,1);
 Theta_3(1) = x_3(1,1);
-
+    
 % Episode Loop
 while k <= kf
     clc
-    fprintf('%.4f \n', T*k)
-    
+    fprintf('Time = %.4f \n', k*T)
     %% Agent actions and next state
 
     %% Determine Actions to Take
-    u(:,k) = action(x,N,Ad,Nu,theta,k);
+    u(:,k) = action(x,N,K,Ad,Nu,theta,k);
 
     % Agent 0 (Leader)
-    u0_temp = -K*x_0(:,k); % Control Input
+    u0_temp = -K*x_0(:,k); %+ 0.05*sin(0.5*T*k); % Control Input
     u_0(k) = sign(u0_temp)*min(MAX_CONTROL, abs(u0_temp)); % Limit Control Input from -1 to 1
     u_0(k+1) = u_0(k);
 
@@ -201,7 +201,7 @@ while k <= kf
 
     %% Next Action
     theta(:,:,k+1) = theta(:,:,k);
-    u(:,k+1) = action(x,N,Ad,Nu,theta,k+1);
+    u(:,k+1) = action(x,N,K,Ad,Nu,theta,k+1);
 
     %% Get Phis
     phi(:,:,k) = Phi(x,u,N,Ad,Nu,k);
@@ -228,28 +228,28 @@ end
 %% PLOT RESULTS
 figure
 subplot(2,1,1)
-plot(t,x_pos_0(1,:))
+plot(t,x_pos_0(:))
 hold on 
-plot(t,x_pos_1(1,:))
+plot(t,x_pos_1(:))
 hold on 
-plot(t,x_pos_2(1,:))
+plot(t,x_pos_2(:))
 hold on 
-plot(t,x_pos_3(1,:)) 
-title('Cart Position (Episode 1)')
+plot(t,x_pos_3(:)) 
+title('Cart Position')
 ylabel('Position [m]')
 xlabel('Time [s]')
 legend('Agent 0 (Leader)', 'Agent 1', 'Agent 2', 'Agent 3')
 grid on
 
 subplot(2,1,2)
-plot(t,Theta_0(1,:))
+plot(t,Theta_0(:))
 hold on
-plot(t,Theta_1(1,:))
+plot(t,Theta_1(:))
 hold on
-plot(t,Theta_2(1,:))
+plot(t,Theta_2(:))
 hold on
-plot(t,Theta_3(1,:))
-title('Pole Angle (Episode 1)')
+plot(t,Theta_3(:))
+title('Pole Angle')
 ylabel('Angle [rad]')
 xlabel('Time [s]')
 legend('Agent 0 (Leader)', 'Agent 1', 'Agent 2', 'Agent 3')
@@ -263,7 +263,7 @@ hold on
 plot(1:kf, rewards(3,:))
 title('Agent Rewards each Time Step')
 ylabel('Reward')
-xlabel('Time Step')
+xlabel('Time')
 grid on
 
 fprintf('FINISHED RUNNING')
@@ -273,15 +273,14 @@ function rew = reward(x,xl,u,Gamma,Lambda,N,Ad,Bd,k)
     rew = zeros(N,1);
     for i = 1:N
         for j = 1:N
-            rew(i) = rew(i) + Ad(i,j)*...
+            rew(i) = rew(i) + Ad(i,j) *...
                 transpose((x(:,i,k)-x(:,j,k)))*Gamma*...
                 (x(:,i,k)-x(:,j,k));
         end
         rew(i) = rew(i) + Bd(i) * transpose((x(:,i,k)-xl(:,k)))*Gamma*...
                 (x(:,i,k)-xl(:,k));
     end
-    rew = rew + transpose(u(:,k))*Lambda*...
-        u(:,k);
+    rew = rew + transpose(u(:,k))*Lambda*u(:,k);
 end
 
 % Phi Function
@@ -325,18 +324,17 @@ function [Rout, Gout, Pout] = estimates(R,G,P,N,Ad,d,w,theta,rew,phi,k)
 end
 
 % Action function
-function u = action(x,N,Ad,Nu,theta,k)
+function u = action(x,N,K,Ad,Nu,theta,k)
     u = zeros(N,1);
-    
     for i = 1:N
         sum1 = 0;
         sum2 = 0;
         for j = 1:N
-            sum1 = sum1 + Ad(i,j) * (norm(x(:,i,k)-x(:,j,k))^2);
+            sum1 = sum1 + Ad(i,j) * (norm((x(:,i,k)-x(:,j,k)))^2);
             for n = 1:4
                 sum2 = sum2 + Ad(i,j) * ((x(n,i,k) - x(n,j,k)));
             end
         end
-        u(i) = ((theta(2,i,k)*exp(-sum1/(Nu(2)^2)))/(2*theta(3,i,k)))*sum2;
+        u(i) = -K*x(:,i,k) + ((theta(2,i,k)*exp(-sum1/(Nu(2)^2)))/(2*theta(3,i,k)))*sum2;
     end
 end

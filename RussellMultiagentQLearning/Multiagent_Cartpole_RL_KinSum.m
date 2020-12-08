@@ -27,14 +27,14 @@ g = 9.81; % [m/s^2] - Gravitational Acceleration Constant
 MAX_CONTROL = 1000; % Maximum Absolute value of Control Input
 
 t0 = 0; % [s] - Start time
-tf = 50; % [s] - End time
+tf = 10; % [s] - End time
 T = 0.01; % [s] - Sampling Time
 t = t0:T:tf; % Time Vector
 
 N = 3; % Number of Agents (excluding leader)
 
 % Initial Conditions
-x_0(:,1) = [0.04; 0; 0.5; 0]; % Initial Conditions - Agent 0 (Leader)
+x_0(:,1) = [0.04; 0; 0; 0]; % Initial Conditions - Agent 0 (Leader)
 x_1(:,1) = [0.02; 0; 0; 0]; % Initial Conditions - Agent 1 (Follower)
 x_2(:,1) = [0.03; 0; 0; 0]; % Initial Conditions - Agent 2 (Follower)
 x_3(:,1) = [-0.01; 0; 0; 0]; % Initial Conditions - Agent 3 (Follower)
@@ -84,19 +84,17 @@ Dd = diag(d);
 Ld = Dd - Ad;
 
 % Left Eigenvector
-P = eye(N) - inv(Dd)*Ld;
-[v,D,w] = eig(P);
+Pr = eye(N) - inv(Dd)*Ld;
+[v,D,w] = eig(Pr);
 
 
 %% Deep Q-Learning Parameters
-LEARNING_RATE = 0.9;
+LEARNING_RATE = 0.01;
 
 Gamma = [1, 0, 0, 0; 0, 0, 0, 0; 0, 0, 1, 0; 0, 0, 0, 0];
 Lambda = 0.1*eye(N);
-Nu = [0.8; 1; 0.08];
-
-theta(:,:,1) = 1e10*rand(N,3); % Initial NN weights
-theta_end_ep(:,:,1) = theta(:,:,1);
+Nu = [0.8; 1];
+theta(:,:,1) = 1e-6*rand(N,3); % Initial NN weights
 
 
 %% Simulation (Discrete Time - Euler Integration)
@@ -120,7 +118,8 @@ Theta_3(1) = x_3(1,1);
     
 % Episode Loop
 while k <= kf
-
+    clc
+    fprintf('Time = %.4f \n', k*T)
     %% Agent actions and next state
 
     %% Determine Actions to Take
@@ -207,8 +206,8 @@ while k <= kf
     u(:,k+1) = action(x,N,K,Ad,Nu,theta,k+1);
 
     %% Get Phis
-    phi(:,:,k) = Phi(x,u,N,Ad,Nu,k);
-    phi(:,:,k+1) = Phi(x,u,N,Ad,Nu,k+1);
+    phi(:,:,k) = Phi(x,u,N,Ad,Nu,K,k);
+    phi(:,:,k+1) = Phi(x,u,N,Ad,Nu,K,k+1);
 
     %% Get Estimations
     if k == 1
@@ -221,7 +220,7 @@ while k <= kf
 
     %% Update Theta
     for agent = 1:N
-        theta(:,agent,k+1) = theta(:,agent,k) + LEARNING_RATE * (R(agent,k) + G(agent,k) - P(agent,k)).* phi(:,agent,k);
+        theta(:,agent,k+1) = (1 - LEARNING_RATE) * theta(:,agent,k) + LEARNING_RATE * (R(agent,k) + G(agent,k) - P(agent,k)).* phi(:,agent,k);
     end
 
     k = k + 1; % Update Timestep
@@ -238,7 +237,7 @@ hold on
 plot(t,x_pos_2(:))
 hold on 
 plot(t,x_pos_3(:)) 
-title('Cart Position (Episode 1)')
+title('Cart Position')
 ylabel('Position [m]')
 xlabel('Time [s]')
 legend('Agent 0 (Leader)', 'Agent 1', 'Agent 2', 'Agent 3')
@@ -252,7 +251,7 @@ hold on
 plot(t,Theta_2(:))
 hold on
 plot(t,Theta_3(:))
-title('Pole Angle (Episode 1)')
+title('Pole Angle')
 ylabel('Angle [rad]')
 xlabel('Time [s]')
 legend('Agent 0 (Leader)', 'Agent 1', 'Agent 2', 'Agent 3')
@@ -264,9 +263,9 @@ hold on
 plot(1:kf, rewards(2,:))
 hold on
 plot(1:kf, rewards(3,:))
-title('Agent Rewards each Episode')
+title('Agent Rewards each Time Step')
 ylabel('Reward')
-xlabel('Episode')
+xlabel('Time Step')
 grid on
 
 fprintf('FINISHED RUNNING')
@@ -288,16 +287,18 @@ function rew = reward(x,xl,u,Gamma,Lambda,N,Ad,Bd,k)
 end
 
 % Phi Function
-function phi = Phi(x,u,N,Ad,Nu,k)
+function phi = Phi(x,u,N,Ad,Nu,K,k)
     phi = zeros(3,N);
     
     for i = 1:N
         sum1 = 0;
         sum2 = 0;
+        sum3 = 0;
         for j = 1:N
-            sum1 = sum1 + Ad(i,j) * (norm(x(:,i,k)-x(:,j,k))^2);
+            sum1 = sum1 + Ad(i,j) * (transpose((x(:,i,k)-x(:,j,k))) * diag(K) * (x(:,i,k)-x(:,j,k)));
+            sum3 = sum3 + Ad(i,j) * (norm((x(:,i,k)-x(:,j,k)))^2);
             for n = 1:4
-                sum2 = sum2 + Ad(i,j) * ((x(n,i,k) - x(n,j,k))*u(i,k));
+                sum2 = sum2 + Ad(i,j) * (K(n) * ((x(n,i,k) - x(n,j,k))))*u(i,k);
             end
         end
         phi(1,i) = exp(-sum1/(Nu(1)^2))*sum1;
@@ -333,8 +334,10 @@ function u = action(x,N,K,Ad,Nu,theta,k)
     for i = 1:N
         sum1 = 0;
         sum2 = 0;
+        sum3 = 0;
         for j = 1:N
-            sum1 = sum1 + Ad(i,j) * (norm((x(:,i,k)-x(:,j,k)))^2);
+            sum1 = sum1 + Ad(i,j) * (transpose((x(:,i,k)-x(:,j,k))) * diag(K) * (x(:,i,k)-x(:,j,k)));
+            sum3 = sum3 + Ad(i,j) * (norm((x(:,i,k)-x(:,j,k)))^2);
             for n = 1:4
                 sum2 = sum2 + Ad(i,j) * K(n) *  ((x(n,i,k) - x(n,j,k)));
             end
