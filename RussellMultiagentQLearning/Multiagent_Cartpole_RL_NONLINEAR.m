@@ -24,7 +24,7 @@ b = 0.1; % [N/(m/s)] - Coefficient of friction of the cart
 l = 0.3; % [m] - Length of pendulum center of mass
 g = 9.81; % [m/s^2] - Gravitational Acceleration Constant
 
-MAX_CONTROL = 10; % Maximum Absolute value of Control Input
+MAX_CONTROL = 100; % Maximum Absolute value of Control Input
 
 t0 = 0; % [s] - Start time
 tf = 10; % [s] - End time
@@ -34,7 +34,7 @@ t = t0:T:tf; % Time Vector
 N = 3; % Number of Agents (excluding leader)
 
 % Initial Conditions
-x_0(:,1) = [0.11; 0; 1; 0]; % Initial Conditions - Agent 0 (Leader)
+x_0(:,1) = [0.11; 0; 0; 0]; % Initial Conditions - Agent 0 (Leader)
 x_1(:,1) = [0.02; 0; 0; 0]; % Initial Conditions - Agent 1 (Follower)
 x_2(:,1) = [0.03; 0; 0; 0]; % Initial Conditions - Agent 2 (Follower)
 x_3(:,1) = [-0.01; 0; 0; 0]; % Initial Conditions - Agent 3 (Follower)
@@ -96,7 +96,6 @@ Lambda = 0.1*eye(N);
 Nu = [0.8; 1; 0.08];
 
 theta(:,:,1) = 1e-6*rand(N,3); % Initial NN weights
-theta_end_ep(:,:,1) = theta(:,:,1);
 
 
 %% Simulation (Discrete Time - Euler Integration)
@@ -126,7 +125,6 @@ while k <= kf
     % Agent 0 (Leader)
     u0_temp = -K*x_0(:,k); % Control Input
     u_0(k) = sign(u0_temp)*min(MAX_CONTROL, abs(u0_temp)); % Limit Control Input from -1 to 1
-    u_0(k+1) = u_0(k);
 
     x0k = [x_0(:,k); u_0(k)];
     [tt, x0k1] = ode45('Cart_model', [t(k) t(k+1)], x0k);
@@ -135,6 +133,9 @@ while k <= kf
     x_0(2,k+1) = x0k1(length(tt),2);
     x_0(3,k+1) = x0k1(length(tt),3);
     x_0(4,k+1) = x0k1(length(tt),4);
+    
+    u0_temp = -K*x_0(:,k+1); % Control Input
+    u_0(k+1) = sign(u0_temp)*min(MAX_CONTROL, abs(u0_temp)); % Limit Control Input from -1 to 1
 
     x_pos_0(k+1) = x_0(3,k+1);
     Theta_0(k+1) = x_0(1,k+1);
@@ -218,7 +219,7 @@ while k <= kf
 
     %% Update Theta
     for agent = 1:N
-        theta(:,agent,k+1) = (1 - LEARNING_RATE) * theta(:,agent,k) + LEARNING_RATE * (R(agent,k) + G(agent,k) - P(agent,k)).* phi(:,agent,k);
+        theta(:,agent,k+1) = theta(:,agent,k) + LEARNING_RATE * (R(agent,k) + G(agent,k) - P(agent,k)).* phi(:,agent,k);
     end
 
     k = k + 1; % Update Timestep
@@ -294,7 +295,7 @@ function phi = Phi(x,u,N,Ad,Nu,k)
         for j = 1:N
             sum1 = sum1 + Ad(i,j) * (norm(x(:,i,k)-x(:,j,k))^2);
             for n = 1:4
-                sum2 = sum2 + Ad(i,j) * ((x(n,i,k) - x(n,j,k))*u(i,k));
+                sum2 = sum2 + Ad(i,j) * (x(n,i,k) - x(n,j,k)) * u(i,k);
             end
         end
         phi(1,i) = exp(-sum1/(Nu(1)^2))*sum1;

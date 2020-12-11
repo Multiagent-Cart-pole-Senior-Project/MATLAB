@@ -1,4 +1,4 @@
-%% Linear Controller for Cart-Pole System %%
+%% Linear Controller with Sinusoidal input for Cart-Pole System %%
 % Author: Ryan Russell
 % 
 % Control Algorithm Developed from: 
@@ -29,9 +29,10 @@ l = 0.5; % [m] - Length of pendulum center of mass
 g = 9.81; % [m/s^2] - Gravitational Acceleration Constant
 
 t0 = 0; % [s] - Start time
-tf = 10; % [s] - End time
+tf = 40; % [s] - End time
 T = 0.01; % [s] - Sampling Time
 t = t0:T:tf; % Time Vector
+tt = t0:T:tf+1; % Time Vector
 
 x(:,1) = [0; 0.01; 0.1; 0.01]; % Initial Conditions
 
@@ -57,14 +58,17 @@ K = acker(A,B,pole_d);
 k = 1; % Starting timestep
 kf = tf/T; % Final timestep
 
-while k <= kf +1
-    u_temp = -K*x(:,k); % Control Input
+while k <= kf+1
+    u_temp = -K*x(:,k) + 0.05*sin(0.5*T*k); % Control Input
     u(k) = sign(u_temp)*min(1 , abs(u_temp));
     
-    x(1,k+1) = x(1,k) + T * x(2,k);
-    x(2,k+1) = x(2,k) + T * ((g*(M+m))/(M*l)*x(1,k) + b/(M*l)*x(4,k) - (1/(M*l))*u(k));
-    x(3,k+1) = x(3,k) + T * x(4,k);
-    x(4,k+1) = x(4,k) + T * (-((m*g)/M)*x(1,k) - (b/M)* x(4,k) + (1/M)*u(k));
+    x0k = [x(:,k); u(k)];
+    [ttt, x0k1] = ode45('Cart_model', [tt(k) tt(k+1)], x0k);
+
+    x(1,k+1) = x0k1(length(ttt),1);
+    x(2,k+1) = x0k1(length(ttt),2);
+    x(3,k+1) = x0k1(length(ttt),3);
+    x(4,k+1) = x0k1(length(ttt),4);
     
     x_pos(k) = x(3,k);
     Theta(k) = x(1,k);

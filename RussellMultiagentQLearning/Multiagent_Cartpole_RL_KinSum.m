@@ -24,7 +24,7 @@ b = 0.1; % [N/(m/s)] - Coefficient of friction of the cart
 l = 0.3; % [m] - Length of pendulum center of mass
 g = 9.81; % [m/s^2] - Gravitational Acceleration Constant
 
-MAX_CONTROL = 1000; % Maximum Absolute value of Control Input
+MAX_CONTROL = 10; % Maximum Absolute value of Control Input
 
 t0 = 0; % [s] - Start time
 tf = 10; % [s] - End time
@@ -124,6 +124,9 @@ while k <= kf
 
     %% Determine Actions to Take
     u(:,k) = action(x,N,K,Ad,Nu,theta,k);
+    for i = 1:N
+        u(i,k) = sign(u(i,k))*min(MAX_CONTROL, abs(u(i,k)));
+    end
 
     % Agent 0 (Leader)
     u0_temp = -K*x_0(:,k) + 0.05*sin(0.5*T*k); % Control Input

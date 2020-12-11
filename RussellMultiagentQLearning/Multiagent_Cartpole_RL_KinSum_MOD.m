@@ -24,17 +24,17 @@ b = 0.1; % [N/(m/s)] - Coefficient of friction of the cart
 l = 0.3; % [m] - Length of pendulum center of mass
 g = 9.81; % [m/s^2] - Gravitational Acceleration Constant
 
-MAX_CONTROL = 1000; % Maximum Absolute value of Control Input
+MAX_CONTROL = 100000; % Maximum Absolute value of Control Input
 
 t0 = 0; % [s] - Start time
-tf = 50; % [s] - End time
+tf = 10; % [s] - End time
 T = 0.01; % [s] - Sampling Time
 t = t0:T:tf; % Time Vector
 
 N = 3; % Number of Agents (excluding leader)
 
 % Initial Conditions
-x_0(:,1) = [0.04; 0; 0.5; 0]; % Initial Conditions - Agent 0 (Leader)
+x_0(:,1) = [0.04; 0; 0; 0]; % Initial Conditions - Agent 0 (Leader)
 x_1(:,1) = [0.02; 0; 0; 0]; % Initial Conditions - Agent 1 (Follower)
 x_2(:,1) = [0.03; 0; 0; 0]; % Initial Conditions - Agent 2 (Follower)
 x_3(:,1) = [-0.01; 0; 0; 0]; % Initial Conditions - Agent 3 (Follower)
@@ -84,8 +84,8 @@ Dd = diag(d);
 Ld = Dd - Ad;
 
 % Left Eigenvector
-P = eye(N) - inv(Dd)*Ld;
-[v,D,w] = eig(P);
+Pr = eye(N) - inv(Dd)*Ld;
+[v,D,w] = eig(Pr);
 
 
 %% Deep Q-Learning Parameters
@@ -93,10 +93,8 @@ LEARNING_RATE = 0.01;
 
 Gamma = [1, 0, 0, 0; 0, 0, 0, 0; 0, 0, 1, 0; 0, 0, 0, 0];
 Lambda = 0.1*eye(N);
-Nu = [0.8; 1; 0.08];
-
+Nu = [0.8; 1];
 theta(:,:,1) = 1e-6*rand(N,3); % Initial NN weights
-theta_end_ep(:,:,1) = theta(:,:,1);
 
 
 %% Simulation (Discrete Time - Euler Integration)
@@ -126,11 +124,13 @@ while k <= kf
 
     %% Determine Actions to Take
     u(:,k) = action(x,N,K,Ad,Nu,theta,k);
+    for i = 1:N
+        u(i,k) = sign(u(i,k))*min(MAX_CONTROL, abs(u(i,k)));
+    end
 
     % Agent 0 (Leader)
-    u0_temp = -K*x_0(:,k) + 0.05*cos(0.5*T*k); % Control Input
+    u0_temp = -K*x_0(:,k) + 0.05*sin(1*T*k); % Control Input
     u_0(k) = sign(u0_temp)*min(MAX_CONTROL, abs(u0_temp)); % Limit Control Input from -1 to 1
-    u_0(k+1) = u_0(k);
 
     x0k = [x_0(:,k); u_0(k)];
     [tt, x0k1] = ode45('Cart_model', [t(k) t(k+1)], x0k);
@@ -140,7 +140,7 @@ while k <= kf
     x_0(3,k+1) = x0k1(length(tt),3);
     x_0(4,k+1) = x0k1(length(tt),4);
     
-    u0_temp = -K*x_0(:,k+1) + 0.05*sin(0.5*T*k); % Control Input
+    u0_temp = -K*x_0(:,k+1) + 0.05*sin(1*T*k); % Control Input
     u_0(k+1) = sign(u0_temp)*min(MAX_CONTROL, abs(u0_temp)); % Limit Control Input from -1 to 1
 
     x_pos_0(k+1) = x_0(3,k+1);
@@ -211,8 +211,8 @@ while k <= kf
     u(:,k+1) = action(x,N,K,Ad,Nu,theta,k+1);
 
     %% Get Phis
-    phi(:,:,k) = Phi(x,u,N,Ad,Nu,k);
-    phi(:,:,k+1) = Phi(x,u,N,Ad,Nu,k+1);
+    phi(:,:,k) = Phi(x,u,N,Ad,Nu,K,k);
+    phi(:,:,k+1) = Phi(x,u,N,Ad,Nu,K,k+1);
 
     %% Get Estimations
     if k == 1
@@ -225,7 +225,7 @@ while k <= kf
 
     %% Update Theta
     for agent = 1:N
-        theta(:,agent,k+1) = (1 - LEARNING_RATE) * theta(:,agent,k) + LEARNING_RATE * (R(agent,k) + G(agent,k) - P(agent,k)).* phi(:,agent,k);
+        theta(:,agent,k+1) = theta(:,agent,k) + LEARNING_RATE * (R(agent,k) + G(agent,k) - P(agent,k)).* phi(:,agent,k);
     end
 
     k = k + 1; % Update Timestep
@@ -270,7 +270,7 @@ hold on
 plot(1:kf, rewards(3,:))
 title('Agent Rewards each Time Step')
 ylabel('Reward')
-xlabel('Time')
+xlabel('Time Step')
 grid on
 
 fprintf('FINISHED RUNNING')
@@ -287,24 +287,30 @@ function rew = reward(x,xl,u,Gamma,Lambda,N,Ad,Bd,k)
         rew(i) = rew(i) + Bd(i) * transpose((x(:,i,k)-xl(:,k)))*Gamma*...
                 (x(:,i,k)-xl(:,k));
     end
-    rew = rew + transpose(u(:,k))*Lambda*u(:,k);
+    rew = rew + transpose(u(:,k))*Lambda*...
+        u(:,k);
 end
 
 % Phi Function
-function phi = Phi(x,u,N,Ad,Nu,k)
+function phi = Phi(x,u,N,Ad,Nu,K,k)
     phi = zeros(3,N);
     
     for i = 1:N
         sum1 = 0;
         sum2 = 0;
+        sum3 = 0;
+        sum4 = 0;
         for j = 1:N
-            sum1 = sum1 + Ad(i,j) * (norm(x(:,i,k)-x(:,j,k))^2);
+            sum4 = sum4 + Ad(i,j) * ((-K * (x(:,i,k)-x(:,j,k)))^2);
+            sum1 = sum1 + Ad(i,j) * (transpose((x(:,i,k)-x(:,j,k))) * (diag(K).^2) * (x(:,i,k)-x(:,j,k)));
+            sum3 = sum3 + Ad(i,j) * (norm((x(:,i,k)-x(:,j,k)))^2);
             for n = 1:4
-                sum2 = sum2 + Ad(i,j) * ((x(n,i,k) - x(n,j,k))*u(i,k));
+                sum2 = sum2 + Ad(i,j) * -K(n) * ((x(n,i,k) - x(n,j,k))) * u(i,k);
             end
+            % sum2 = sum2 * u(i,k);
         end
-        phi(1,i) = exp(-sum1/(Nu(1)^2))*sum1;
-        phi(2,i) = exp(-sum1/(Nu(2)^2))*sum2;
+        phi(1,i) = exp(-sum4/(Nu(1)^2))*sum4;
+        phi(2,i) = exp(-sum4/(Nu(2)^2))*sum2;
         phi(3,i) = u(i,k)^2;
     end
     
@@ -336,12 +342,16 @@ function u = action(x,N,K,Ad,Nu,theta,k)
     for i = 1:N
         sum1 = 0;
         sum2 = 0;
+        sum3 = 0;
+        sum4 = 0;
         for j = 1:N
-            sum1 = sum1 + Ad(i,j) * (norm((x(:,i,k)-x(:,j,k)))^2);
+            sum4 = sum4 + Ad(i,j) * ((-K * (x(:,i,k)-x(:,j,k)))^2);
+            sum1 = sum1 + Ad(i,j) * (transpose((x(:,i,k)-x(:,j,k))) * (diag(K).^2) * (x(:,i,k)-x(:,j,k)));
+            sum3 = sum3 + Ad(i,j) * (norm((x(:,i,k)-x(:,j,k)))^2);
             for n = 1:4
-                sum2 = sum2 + Ad(i,j) * ((x(n,i,k) - x(n,j,k)));
+                sum2 = sum2 + Ad(i,j) * -K(n) *  ((x(n,i,k) - x(n,j,k)));
             end
         end
-        u(i) = -K*x(:,i,k) + ((theta(2,i,k)*exp(-sum1/(Nu(2)^2)))/(2*theta(3,i,k)))*sum2;
+        u(i) = ((theta(2,i,k)*exp(-sum4/(Nu(2)^2)))/(2*theta(3,i,k)))*sum2;
     end
 end
