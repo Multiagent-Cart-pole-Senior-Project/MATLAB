@@ -109,7 +109,7 @@ Nu = [0.8; 1; 0.08];
 
 theta_1(:,1) = 1e-6*rand(6,1); % Initial NN weights (6x1)
 theta_2(:,1) = 1e-6*rand(11,1); % Initial NN weights (11x1)
-theta_3(:,1) = 1e-6*rand(11,1); % Initial NN weights (11x1)
+theta_3(:,1) = 1e-6*rand(6,1); % Initial NN weights (11x1)
 
 %% Simulation (Discrete Time - Euler Integration)
 k = 1; % Starting timestep
@@ -309,7 +309,7 @@ end
 function [phi_1, phi_2, phi_3] = Phi(x,u,N,Ad,Nu,k)
     phi_1 = zeros(6,1);
     phi_2 = zeros(11,1);
-    phi_3 = zeros(11,1);
+    phi_3 = zeros(6,1);
     
     % Agent 1
     phi_1(1,1) = norm(x(:,2,k) - x(:,1,k))^2;
@@ -333,17 +333,12 @@ function [phi_1, phi_2, phi_3] = Phi(x,u,N,Ad,Nu,k)
     phi_2(11,1) = u(2,k)^2;    
     
     % Agent 3
-    phi_3(1,1) = (norm(x(:,3,k) - x(:,1,k))^2);
-    phi_3(2,1) = (norm(x(:,2,k) - x(:,1,k))^2);
-    phi_3(3,1) = ((x(1,3,k)-x(1,1,k))*u(3,k));
-    phi_3(4,1) = ((x(2,3,k)-x(2,1,k))*u(3,k));
-    phi_3(5,1) = ((x(3,3,k)-x(3,1,k))*u(3,k)); 
-    phi_3(6,1) = ((x(4,3,k)-x(4,1,k))*u(3,k));
-    phi_3(7,1) = ((x(1,3,k)-x(1,2,k))*u(3,k));
-    phi_3(8,1) = ((x(2,3,k)-x(2,2,k))*u(3,k));
-    phi_3(9,1) = ((x(3,3,k)-x(3,2,k))*u(3,k));
-    phi_3(10,1) = ((x(4,3,k)-x(4,2,k))*u(3,k));
-    phi_3(11,1) = u(3,k)^2;         
+    phi_3(1,1) = norm(x(:,2,k) - x(:,3,k))^2;
+    phi_3(2,1) = (x(1,3,k)-x(1,2,k))*u(3,k);
+    phi_3(3,1) = (x(2,3,k)-x(2,2,k))*u(3,k);
+    phi_3(4,1) = (x(3,3,k)-x(3,2,k))*u(3,k);
+    phi_3(5,1) = (x(4,3,k)-x(4,2,k))*u(3,k);
+    phi_3(6,1) = u(3,k)^2;        
 end
 
 % Estimation Functions
@@ -393,12 +388,8 @@ function u = action(x,N,Ad,Nu,theta_1,theta_2,theta_3,k)
     u(2) = (sum1 + sum2)/(2*theta_2(11,k));
     
     % u3
-    sum1 = 0;
-    sum2 = 0;
-    for j = 1:4 
-        sum1 = sum1 + ((x(j,1,k)-x(j,3,k))*theta_3(j+2,k)); 
-        sum2 = sum2 + ((x(j,2,k)-x(j,3,k))*theta_3(j+6,k));
-    end
-    u(3) = (sum1 + sum2)/(2*theta_3(11,k));    
+    u(3) = (((x(1,2,k) - x(1,3,k))*theta_3(1,k)) + ((x(2,2,k) - x(2,3,k))*theta_3(2,k))...
+        + ((x(3,2,k) - x(3,3,k))*theta_3(3,k)) + ((x(4,2,k) - x(4,3,k))*theta_3(4,k)))/...
+        (2*theta_3(6,k));    
     
 end
