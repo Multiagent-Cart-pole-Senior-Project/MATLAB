@@ -256,7 +256,7 @@ hold on
 plot(t,x_pos_2(1,:))
 hold on 
 plot(t,x_pos_3(1,:)) 
-title('Cart Position (Episode 1)')
+title('Cart Position')
 ylabel('Position [m]')
 xlabel('Time [s]')
 legend('Agent 0 (Leader)', 'Agent 1', 'Agent 2', 'Agent 3')
@@ -270,7 +270,7 @@ hold on
 plot(t,Theta_2(1,:))
 hold on
 plot(t,Theta_3(1,:))
-title('Pole Angle (Episode 1)')
+title('Pole Angle')
 ylabel('Angle [rad]')
 xlabel('Time [s]')
 legend('Agent 0 (Leader)', 'Agent 1', 'Agent 2', 'Agent 3')
