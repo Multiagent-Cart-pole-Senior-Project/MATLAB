@@ -64,7 +64,7 @@ K = acker(A,B,pole_d);
 %% Communication Matrices
 
 % Communication with Leader
-Bd = [1 1 1 1];
+Bd = [1 1 1];
 
 % Adjacency Matrix
 Ad = [0 1 1; 1 0 1; 1 1 0];
@@ -84,8 +84,19 @@ Dd = diag(d);
 Ld = Dd - Ad;
 
 % Left Eigenvector
-P = eye(N) - inv(Dd)*Ld;
-[v,D,w] = eig(P);
+one = [1;1;1];
+DD = Ad*one; %1; d2 =2; d3=1;
+d1 = DD(1); d2 = DD(2); d3 = DD(3);
+II = eye(3);
+D = diag(DD);
+L = D-Ad;
+F = (II -inv(II+D)*L);
+[V, DD] = eig(F');
+w1 = V(1,3)/(V(1,3)+V(2,3)+V(3,3));
+w2 = V(2,3)/(V(1,3)+V(2,3)+V(3,3));
+w3 = V(3,3)/(V(1,3)+V(2,3)+V(3,3));
+
+w = [w1; w2; w3]; % Left Eigenvector
 
 
 %% Deep Q-Learning Parameters
@@ -318,9 +329,9 @@ function [Rout, Gout, Pout] = estimates(R,G,P,N,Ad,d,w,theta,rew,phi,k)
             P_sum = P_sum + Ad(i,j)*(P(j,k-1)-P(i,k-1));
         end
         % Estimations
-        Rout(i) = R(i,k-1) + (1/(1+d(i)))*R_sum + (1/w(i,i))*(rew(i,k)-rew(i,k-1));
-        Gout(i) = G(i,k-1) + (1/(1+d(i)))*G_sum + (1/w(i,i))*((transpose(phi(:,i,k+1))*theta(:,i,k))-(transpose(phi(:,i,k))*theta(:,i,k-1)));
-        Pout(i) = P(i,k-1) + (1/(1+d(i)))*P_sum + (1/w(i,i))*((transpose(phi(:,i,k))*theta(:,i,k))-(transpose(phi(:,i,k-1))*theta(:,i,k-1)));
+        Rout(i) = R(i,k-1) + (1/(1+d(i)))*R_sum + (1/w(i))*(rew(i,k)-rew(i,k-1));
+        Gout(i) = G(i,k-1) + (1/(1+d(i)))*G_sum + (1/w(i))*((transpose(phi(:,i,k+1))*theta(:,i,k))-(transpose(phi(:,i,k))*theta(:,i,k-1)));
+        Pout(i) = P(i,k-1) + (1/(1+d(i)))*P_sum + (1/w(i))*((transpose(phi(:,i,k))*theta(:,i,k))-(transpose(phi(:,i,k-1))*theta(:,i,k-1)));
     end
         
 end

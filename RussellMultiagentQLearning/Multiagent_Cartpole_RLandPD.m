@@ -27,7 +27,7 @@ g = 9.81; % [m/s^2] - Gravitational Acceleration Constant
 MAX_CONTROL = 1000; % Maximum Absolute value of Control Input
 
 t0 = 0; % [s] - Start time
-tf = 50; % [s] - End time
+tf = 200; % [s] - End time
 T = 0.01; % [s] - Sampling Time
 t = t0:T:tf; % Time Vector
 
@@ -84,8 +84,19 @@ Dd = diag(d);
 Ld = Dd - Ad;
 
 % Left Eigenvector
-P = eye(N) - inv(Dd)*Ld;
-[v,D,w] = eig(P);
+one = [1;1;1];
+DD = Ad*one; %1; d2 =2; d3=1;
+d1 = DD(1); d2 = DD(2); d3 = DD(3);
+II = eye(3);
+D = diag(DD);
+L = D-Ad;
+F = (II -inv(II+D)*L);
+[V, DD] = eig(F');
+w1 = V(1,3)/(V(1,3)+V(2,3)+V(3,3));
+w2 = V(2,3)/(V(1,3)+V(2,3)+V(3,3));
+w3 = V(3,3)/(V(1,3)+V(2,3)+V(3,3));
+
+w = [w1; w2; w3]; % Left Eigenvector
 
 
 %% Deep Q-Learning Parameters
@@ -128,7 +139,7 @@ while k <= kf
     u(:,k) = action(x,N,K,Ad,Nu,theta,k);
 
     % Agent 0 (Leader)
-    u0_temp = -K*x_0(:,k) + 0.05*cos(0.5*T*k); % Control Input
+    u0_temp = -K*x_0(:,k) + 0.05*cos(T*k); % Control Input
     u_0(k) = sign(u0_temp)*min(MAX_CONTROL, abs(u0_temp)); % Limit Control Input from -1 to 1
     u_0(k+1) = u_0(k);
 
@@ -323,9 +334,9 @@ function [Rout, Gout, Pout] = estimates(R,G,P,N,Ad,d,w,theta,rew,phi,k)
             P_sum = P_sum + Ad(i,j)*(P(j,k-1)-P(i,k-1));
         end
         % Estimations
-        Rout(i) = R(i,k-1) + (1/(1+d(i)))*R_sum + (1/w(i,i))*(rew(i,k)-rew(i,k-1));
-        Gout(i) = G(i,k-1) + (1/(1+d(i)))*G_sum + (1/w(i,i))*((transpose(phi(:,i,k+1))*theta(:,i,k))-(transpose(phi(:,i,k))*theta(:,i,k-1)));
-        Pout(i) = P(i,k-1) + (1/(1+d(i)))*P_sum + (1/w(i,i))*((transpose(phi(:,i,k))*theta(:,i,k))-(transpose(phi(:,i,k-1))*theta(:,i,k-1)));
+        Rout(i) = R(i,k-1) + (1/(1+d(i)))*R_sum + (1/w(i))*(rew(i,k)-rew(i,k-1));
+        Gout(i) = G(i,k-1) + (1/(1+d(i)))*G_sum + (1/w(i))*((transpose(phi(:,i,k+1))*theta(:,i,k))-(transpose(phi(:,i,k))*theta(:,i,k-1)));
+        Pout(i) = P(i,k-1) + (1/(1+d(i)))*P_sum + (1/w(i))*((transpose(phi(:,i,k))*theta(:,i,k))-(transpose(phi(:,i,k-1))*theta(:,i,k-1)));
     end
         
 end
